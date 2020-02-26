@@ -82,7 +82,7 @@
     </div>
 
       <span slot="footer" class="dialog-footer">
-        <el-button @click="dialogVisible = false">取 消</el-button>
+        <el-button @click="closeDialog">取 消</el-button>
         <el-button type="primary" @click="handleOk()">确 定</el-button>
       </span>
     </el-dialog>
@@ -141,10 +141,18 @@ export default {
     }
   },
   methods: {
+    // 关闭对话框
+    closeDialog () {
+      this.dialogVisible = false
+      this.addCate = ''
+      this.amount = ''
+    },
+
     // 改变排序方式
     changeSortType () {
       this.sortType = this.sortType === 0 ? 1 : 0
     },
+    // 获取多种列表
     getList () {
       this.getBillList()
       this.getRankList()
@@ -152,10 +160,15 @@ export default {
     // 获取账单列表
     async getBillList () {
       try {
-        this.list = (await getBill({
+        const result = await getBill({
           month: this.month,
           needCate: this.cate
-        })).list.map(ele => {
+        })
+        if (result.status === 0) {
+          this.$msg.error('数据加载失败')
+          return
+        }
+        this.list = result.list.map(ele => {
           ele.time = (new Date(ele.time - 0)).toLocaleString()
           ele.amount = Number(ele.amount).toFixed(2)
           ele.type = ele.type === '0' ? '收入' : '支出'
@@ -165,14 +178,21 @@ export default {
         this.$msg.error('数据加载失败')
       }
     },
+    // 获取排序列表
     async getRankList () {
       if (!this.month) {
         return
       }
       try {
-        const list = (await getBill({
+        const result = (await getBill({
           month: this.month
-        })).list
+        }))
+        if (result.status === 0) {
+          this.$msg.error('数据加载失败')
+          return
+        }
+        const list = result.list
+
         const rankList = []
         list.forEach(ele => {
           const index = rankList.findIndex(item => item.category === ele.category)
@@ -189,8 +209,6 @@ export default {
           }
         })
         this.rankList = rankList.sort((a, b) => this.sortType === 0 ? (a - b) : (b - a))
-
-        console.log(rankList)
       } catch (err) {
         this.$msg.error('数据加载失败')
       }
@@ -198,7 +216,12 @@ export default {
     // 获取类别列表
     async getCateList () {
       try {
-        this.cateList = (await getCate()).list
+        const result = await getCate()
+        if (result.status === 0) {
+          this.$msg.error('数据加载失败')
+          return
+        }
+        this.cateList = result.list
       } catch (err) {
         this.$msg.error('数据加载失败')
       }
@@ -210,12 +233,20 @@ export default {
         amount: this.amount
       }
       try {
-        await addBill(data)
+        const result = await addBill(data)
+        if (result.status === 0) {
+          this.$msg({
+            type: 'error',
+            message: '添加失败'
+          })
+          return
+        }
         this.getList()
         this.$msg({
           type: 'success',
           message: '添加成功'
         })
+        this.closeDialog()
       } catch (error) {
         this.$msg({
           type: 'error',
@@ -238,7 +269,6 @@ export default {
             message: '添加的数据格式错误'
           })
         } else {
-          this.dialogVisible = false
           this.addBillList()
         }
       }).catch(() => {
